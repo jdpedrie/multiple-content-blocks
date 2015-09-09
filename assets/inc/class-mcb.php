@@ -61,10 +61,9 @@ class MCB {
 		$blocks = $this->get_blocks( $post->ID );
 		if( is_wp_error( $blocks ) ) {
 			echo '<p>' . $blocks->get_error_message() . '</p>';
-			$blocks = $this->get_blocks( $post->ID, false );
 		}
 
-		if( $blocks ) {
+		else if (is_array($blocks)) {
 			foreach( $blocks as $id => $block ) {
 
 				if( is_array( $block ) ) {
@@ -85,24 +84,6 @@ class MCB {
 							'wp_autoresize_on' => false,
 						),
 					) );
-			}
-
-			if( true === (bool) get_option( 'mcb-disable-http-requests' ) ) {
-				?>
-
-				<h2>
-					<?php _e( 'Help! These are not the right blocks.', 'mcb' ); ?>
-
-					<a class="button-secondary" target="_blank" href="<?php echo get_permalink( $post->ID ); ?>">
-						<?php _e( 'Refresh', 'mcb' ); ?>
-					</a>
-				</h2>
-
-				<p class="http-off">
-					<?php _e( 'That\'s right. When you have HTTP requests switched off, you have to refresh the blocks manually by visiting the page. ', 'mcb' ); ?>
-				</p>
-
-				<?php
 			}
 		}
 	}
@@ -210,59 +191,10 @@ class MCB {
 			if (file_exists($manifest)) {
 				return json_decode(file_get_contents($manifest), true);
 			}
-		}
-	}
-
-	/**
-	 * Update which MCB's there are on a post or page by visiting it
-	 *
-	 * @param int $post_id
-	 */
-	function refresh_blocks( $post_id ) {
-		if( true === (bool) get_option( 'mcb-disable-http-requests' ) )
-			return true;
-
-		$post = get_post( $post_id );
-		$type = get_post_type_object( $post->post_type );
-
-		if( $type->public ) {
-			$args = array();
-
-			$request_url = get_permalink( $post_id );
-
-			/**
-			 * Preview link (for drafts and auto-drafts)
-			 */
-			$request_url = apply_filters( 'preview_post_link', add_query_arg( '_mcb_preview', 'true', add_query_arg( 'preview', 'true', $request_url ) ) );
-
-			/**
-			 * Send (auth) cookies
-			 */
-			if( 0 < count( $_COOKIE ) ) {
-				$args['cookies'] = array();
-
-				foreach( $_COOKIE as $name => $value )
-					$args['cookies'][] = new WP_Http_Cookie( array(
-						'name'  => $name,
-						'value' => $value,
-					) );
+			else {
+				return new WP_Error('error', 'Could not find any content blocks');
 			}
-
-			/**
-			 * Basic HTTP authentication
-			 */
-			if( isset( $_SERVER['PHP_AUTH_USER'] ) && 0 < strlen( $_SERVER['PHP_AUTH_USER'] ) && isset( $_SERVER['PHP_AUTH_PW'] ) && 0 < strlen( $_SERVER['PHP_AUTH_PW'] ) )
-				$args['headers'] = array(
-					'Authorization' => 'Basic ' . base64_encode( esc_attr( $_SERVER['PHP_AUTH_USER'] ) . ':' . esc_attr( $_SERVER['PHP_AUTH_PW'] ) ),
-				);
-
-			$request = wp_remote_get( $request_url, $args );
-
-			if( is_wp_error( $request ) || 200 != $request['response']['code'] ) //HTTP Request failed: Tell the user to do this manually
-				return new WP_Error( 'mcb', sprintf( __( '<p>It doesn\'t look like we can automatically initialize the blocks. <a href="%1$s" target="_blank">Visit this page</a> in the front-end and then try again.</p><p>To turn off this option entirely, go to the <a href="%2$s">settings page</a> and disable HTTP Requests. You will still need to perform the steps above.</p>', 'mcb' ), get_permalink( $post_id ), admin_url( 'options-general.php?page=mcb-settings' ) ) );
 		}
-
-		return true;
 	}
 
 	/**
