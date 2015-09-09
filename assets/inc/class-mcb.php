@@ -5,7 +5,7 @@
  * @package MCB
  * @subpackage Admin
  */
- 
+
 class MCB {
 	/**
 	 * Constructor
@@ -13,17 +13,17 @@ class MCB {
 	function __construct() {
 		//Initialize
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_box' ) );
-		
+
 		//Save the blocks
 		add_action( 'save_post', array( $this, 'save_blocks' ) );
-		
+
 		//Admin CSS
 		add_action( 'admin_enqueue_scripts', array( $this, 'add_css' ) );
 
 		//Allow auto-draft to be previewed
 		add_action( 'wp_loaded', array( $this, 'auto_draft_preview' ) );
 	}
-	
+
 	/**
 	 * Add CSS
 	 */
@@ -36,34 +36,34 @@ class MCB {
 			'confirm_delete' => __( 'Are you sure you want to delete this block entirely? It will be lost forever!', 'mcb' ),
 		) );
 	}
-	
+
 	/**
-	 * Add meta box when the post has a block 
+	 * Add meta box when the post has a block
 	 */
 	function add_meta_box() {
 		global $post;
-		
+
 		$type = get_post_type_object( $post->post_type );
 
 		if( $this->get_blocks( $post->ID ) )
 			add_meta_box( 'multiple-content-blocks-box', __( 'Multiple content blocks', 'mcb' ), array( $this, 'meta_box' ), $post->post_type, 'normal', 'high' );
-		
+
 		if( true === (bool) get_option( 'mcb-show-inactive-blocks' ) && $this->get_inactive_blocks( $post->ID ) )
 			add_meta_box( 'multiple-content-blocks-box-inactive', __( 'Multiple content blocks (inactive)', 'mcb' ), array( $this, 'meta_box_inactive' ), $post->post_type, 'normal', 'high' );
 	}
-	
+
 	/**
 	 * Show meta box
 	 */
 	function meta_box() {
 		global $post;
-		
+
 		$blocks = $this->get_blocks( $post->ID );
 		if( is_wp_error( $blocks ) ) {
 			echo '<p>' . $blocks->get_error_message() . '</p>';
 			$blocks = $this->get_blocks( $post->ID, false );
 		}
-		
+
 		if( $blocks ) {
 			foreach( $blocks as $id => $block ) {
 
@@ -86,12 +86,12 @@ class MCB {
 						),
 					) );
 			}
-			
+
 			if( true === (bool) get_option( 'mcb-disable-http-requests' ) ) {
 				?>
 
 				<h2>
-					<?php _e( 'Help! These are not the right blocks.', 'mcb' ); ?> 
+					<?php _e( 'Help! These are not the right blocks.', 'mcb' ); ?>
 
 					<a class="button-secondary" target="_blank" href="<?php echo get_permalink( $post->ID ); ?>">
 						<?php _e( 'Refresh', 'mcb' ); ?>
@@ -106,15 +106,15 @@ class MCB {
 			}
 		}
 	}
-	
+
 	/**
 	 * Show inactive blocks
 	 */
 	function meta_box_inactive() {
 		global $post;
-		
+
 		$blocks = $this->get_inactive_blocks( $post->ID );
-		
+
 		if( $blocks ) {
 			?>
 
@@ -135,7 +135,7 @@ class MCB {
 							</td>
 
 							<td>
-								<a class="mcb-show"><?php _e( 'Show', 'mcb' ); ?></a> | 
+								<a class="mcb-show"><?php _e( 'Show', 'mcb' ); ?></a> |
 								<a class="mcb-delete" href="<?php echo get_edit_post_link( $post->ID ) . '&amp;delete_mcb=' . $id; ?>"><?php _e( 'Delete', 'mcb' ); ?></a>
 							</td>
 						</tr>
@@ -153,7 +153,7 @@ class MCB {
 			<?php
 		}
 	}
-	
+
 	/**
 	 * Maybe delete a block
 	 */
@@ -163,7 +163,7 @@ class MCB {
 			delete_post_meta( $post->ID, '_mcb-' . $_GET['delete_mcb'] );
 		}
 	}
-	
+
 	/**
 	 * Save the blocks
 	 *
@@ -178,7 +178,7 @@ class MCB {
 
 		if( isset( $_REQUEST['doing_wp_cron'] ) )
 			return;
-			
+
 		if( isset( $_REQUEST['post_view'] ) )
 		    return;
 
@@ -188,7 +188,7 @@ class MCB {
 		$blocks = $this->get_blocks( $post_id );
 		if( is_wp_error( $blocks ) )
 			$blocks = $this->get_blocks( $post_id, false );
-		
+
 		if( $blocks ) {
 			foreach( $blocks as $id => $args ) {
 				if( isset( $_POST[ '_mcb_' . $id ] ) )
@@ -196,7 +196,7 @@ class MCB {
 			}
 		}
 	}
-	
+
 	/**
 	 * Retrieve content blocks for this post
 	 *
@@ -204,17 +204,15 @@ class MCB {
 	 */
 	function get_blocks( $post_id, $refresh = true ) {
 		if( $post_id ) {
-			if( $refresh ) {
-				$refreshed = $this->refresh_blocks( $post_id );
-
-				if( is_wp_error( $refreshed ) )
-					return $refreshed;
+			$p = get_post($post_id);
+			$filename = explode('.', basename($p->page_template))[0];
+			$manifest = sprintf('%s/mu-plugins/content-blocks/%s.json', WP_CONTENT_DIR, $filename);
+			if (file_exists($manifest)) {
+				return json_decode(file_get_contents($manifest), true);
 			}
-			
-			return get_post_meta( $post_id, '_mcb-blocks', true );
 		}
 	}
-	
+
 	/**
 	 * Update which MCB's there are on a post or page by visiting it
 	 *
@@ -223,10 +221,10 @@ class MCB {
 	function refresh_blocks( $post_id ) {
 		if( true === (bool) get_option( 'mcb-disable-http-requests' ) )
 			return true;
-		
+
 		$post = get_post( $post_id );
 		$type = get_post_type_object( $post->post_type );
-		
+
 		if( $type->public ) {
 			$args = array();
 
@@ -248,7 +246,7 @@ class MCB {
 						'name'  => $name,
 						'value' => $value,
 					) );
-			}		
+			}
 
 			/**
 			 * Basic HTTP authentication
@@ -260,13 +258,13 @@ class MCB {
 
 			$request = wp_remote_get( $request_url, $args );
 
-			if( is_wp_error( $request ) || 200 != $request['response']['code'] ) //HTTP Request failed: Tell the user to do this manually					
+			if( is_wp_error( $request ) || 200 != $request['response']['code'] ) //HTTP Request failed: Tell the user to do this manually
 				return new WP_Error( 'mcb', sprintf( __( '<p>It doesn\'t look like we can automatically initialize the blocks. <a href="%1$s" target="_blank">Visit this page</a> in the front-end and then try again.</p><p>To turn off this option entirely, go to the <a href="%2$s">settings page</a> and disable HTTP Requests. You will still need to perform the steps above.</p>', 'mcb' ), get_permalink( $post_id ), admin_url( 'options-general.php?page=mcb-settings' ) ) );
 		}
-		
+
 		return true;
 	}
-	
+
 	/**
 	 * Get inactive blocks
 	 *
@@ -274,27 +272,27 @@ class MCB {
 	 */
 	function get_inactive_blocks( $post_id ) {
 		$this->maybe_delete_block();
-		
+
 		global $wpdb;
-		
+
 		$blocks = $this->get_blocks( $post_id, false );
-		
+
 		$blocks['blocks'] = true; //Saved blocks
-		
+
 		$all_blocks = $wpdb->get_results( "SELECT * FROM " . $wpdb->postmeta . " WHERE post_id='" . $post_id . "' AND meta_key LIKE '_mcb-%'" );
 		$inactive_blocks = array();
-		
+
 		if( $all_blocks ) {
 			foreach( $all_blocks as $inactive_block ) {
 				$id = str_replace( '_mcb-', '', $inactive_block->meta_key );
-				
+
 				if( isset( $blocks[ $id ] ) )
 					continue;
-				
+
 				$inactive_blocks[] = $inactive_block;
 			}
 		}
-		
+
 		return $inactive_blocks;
 	}
 
